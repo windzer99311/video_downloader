@@ -1,5 +1,5 @@
 import streamlit as st
-from pytube import YouTube
+from pytubefix import YouTube
 import requests
 from io import BytesIO
 
@@ -45,3 +45,4 @@ if st.button("Fetch Thumbnail"):
                     )
     else:
         st.warning("Please enter a valid YouTube video URL.")
+

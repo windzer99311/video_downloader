@@ -19,4 +19,4 @@ if link:
             file_name="test.mp4",
             mime="video/mp4"
         )
-    os.remove("test.mp4")
+

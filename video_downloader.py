@@ -1,93 +1,47 @@
 import streamlit as st
-from pytubefix import YouTube, Search, exceptions
-from pytubefix.cli import on_progress
-from streamlit_elements import media, elements
-import tempfile
-import os
+from pytube import YouTube
+import requests
+from io import BytesIO
 
-st.set_page_config(layout="wide")
-
-def middle():
-    col1, col2, col3 = st.columns([1, 4, 1])
-    with col1:
-        pass
-    with col2:
-        main()
-    with col3:
-        pass
-
-def show_info(url):
+def fetch_thumbnail(video_url):
     try:
-        yt = YouTube(url, on_progress_callback=on_progress)
-        st.text(yt.title)
-    except exceptions.LoginRequired:
-        st.error("This video requires login to view.")
+        yt = YouTube(video_url)
+        thumbnail_url = yt.thumbnail_url
+        return thumbnail_url, yt.title
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return None, None
 
-def download(url, progress_bar, progress_text):
+def download_thumbnail(thumbnail_url):
     try:
-        yt = YouTube(url, on_progress_callback=lambda stream, chunk, bytes_remaining: custom_on_progress(stream, chunk, bytes_remaining, progress_bar, progress_text))
-        ys = yt.streams.get_highest_resolution()
-        
-        # Create a temporary directory
-        temp_dir = tempfile.mkdtemp()
-        
-        # Download the video to the temporary directory
-        file_path = ys.download(output_path=temp_dir)
-        
-        # Provide a download button
-        with open(file_path, "rb") as file:
-            st.download_button(label="Download Video", data=file, file_name=f"{yt.title}.mp4", mime="video/mp4")
-        
-        st.success("Download Complete!")
-    except exceptions.LoginRequired:
-        st.error("This video requires login to download.")
+        response = requests.get(thumbnail_url)
+        response.raise_for_status()
+        return BytesIO(response.content)
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching the thumbnail: {e}")
+        return None
 
-# Custom progress callback for Streamlit
-def custom_on_progress(stream, chunk, bytes_remaining, progress_bar, progress_text):
-    total_size = stream.filesize
-    bytes_downloaded = total_size - bytes_remaining
-    percentage = bytes_downloaded / total_size * 100
+# Streamlit UI
+st.title("YouTube Thumbnail Downloader")
+st.write("Enter a YouTube video URL to download its thumbnail.")
 
-    # Update progress bar and progress text
-    progress_bar.progress(min(percentage / 100, 1.0))  # Ensure it's within 0-1
-    progress_text.text(f"Progress: {percentage:.2f}%")
+video_url = st.text_input("YouTube Video URL", "")
 
-def player(a):
-    with elements("media_player"):
-        media.Player(a, controls=True)
+if st.button("Fetch Thumbnail"):
+    if video_url.strip():
+        thumbnail_url, video_title = fetch_thumbnail(video_url.strip())
+        if thumbnail_url:
+            st.success(f"Thumbnail fetched for: {video_title}")
+            st.image(thumbnail_url, caption=video_title, use_column_width=True)
 
-def main():
-    st.header("YouTube Downloader")
-    with st.container(border=True):
-        a = st.text_input("Input a URL")
-        if a:
-            show_info(a)
-            player(a)
-            if st.button("Download"):
-                st.balloons()
-                # Create progress bar and text element
-                progress_bar = st.progress(0)
-                progress_text = st.empty()
-                download(a, progress_bar, progress_text)
-
-pages = st.sidebar.selectbox("select a value", ["Download", "Search"])
-
-def search(b):
-    result = Search(b)
-    for video in result.videos:
-        try:
-            st.text(f'Title: {video.title}')
-            button = st.button(video.watch_url)
-            if button:
-                player(button)
-            
-            st.text(f'Duration: {video.length} seg')
-            print('---')
-        except exceptions.LoginRequired:
-            st.error("This video requires login to view.")
-
-if pages == "Download":
-    middle()
-if pages == "Search":
-    st.session_state.a = st.text_input("Here you can search videos")
-    search(st.session_state.a)
+            if st.button("Download Thumbnail"):
+                thumbnail_file = download_thumbnail(thumbnail_url)
+                if thumbnail_file:
+                    st.download_button(
+                        label="Download Thumbnail",
+                        data=thumbnail_file,
+                        file_name=f"{video_title}_thumbnail.jpg",
+                        mime="image/jpeg",
+                    )
+    else:
+        st.warning("Please enter a valid YouTube video URL.")

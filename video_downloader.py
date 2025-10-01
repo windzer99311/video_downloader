@@ -80,7 +80,7 @@ def merge(video_data,audio_data):
         "-c", "copy",  # no re-encoding, just mux
         output_file
     ]
-    subprocess.run([f"{sys.executable}", "video_downloader.py"])
+   subprocess.run(cmd, check=True)
     os.remove(video_data)
     os.remove(audio_data)
     st.success("Video Processed Successfully!!")
@@ -178,4 +178,5 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 

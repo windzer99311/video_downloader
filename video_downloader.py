@@ -1,23 +1,22 @@
-import io
+import os
 import streamlit as st
 from pytubefix import YouTube
-
-link = st.text_input("Enter YouTube URL")
-
+import requests
+link=st.text_input("Enter Your Url")
 if link:
-    yt = YouTube(link)
-    stream = yt.streams.filter(res="360p", progressive=True).first()
-
-    if stream:
-        buffer = io.BytesIO()
-        stream.stream_to_buffer(buffer)
-        buffer.seek(0)
-
+    yt=YouTube(link)
+    stream=yt.streams.filter(res='360p').first()
+    stream_url=stream.url
+    response=requests.get(stream_url)
+    with open("test.mp4","wb") as f:
+        print(response.content)
+        f.write(response.content)
+    st.success("Downloaded")
+    with open("test.mp4","rb") as fs:
         st.download_button(
             label="⬇️ Download Video",
-            data=buffer,
-            file_name="video.mp4",
+            data=fs,
+            file_name="test.mp4",
             mime="video/mp4"
         )
-    else:
-        st.error("No 360p progressive stream available")
+    os.remove("test.mp4")

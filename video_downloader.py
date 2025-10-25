@@ -3,7 +3,7 @@ from pytubefix import YouTube
 from pytubefix.exceptions import RegexMatchError
 from math import ceil,floor
 from concurrent.futures import ThreadPoolExecutor
-video_segment_list,audio_segment_list,Reso_list,Aud_list,vid_resolution,aud_resolution=[],[],[],[],[],[]
+video_segment_list,audio_segment_list,Reso_list,Aud_list,vid_resolution,aud_resolution,Reso_check=[],[],[],[],[],[],[]
 video_file,audio_file,output_file="Video.mp4","Audio.mp3",'Downloaded.mp4'
 total_received,percentage=0,0
 
@@ -105,9 +105,12 @@ def main():
             yt=YouTube(link)
             streams=yt.streams
             for stream in streams.filter(only_video=True):
-                if "avc1" in stream.video_codec:
-                    video_resolution=stream.resolution,stream.itag,stream.filesize
+                video_resolution=stream.resolution,stream.itag,stream.filesize,stream.fps
+                print(video_resolution)
+                if video_resolution[0]+str(video_resolution[3]) not in Reso_check:
                     Reso_list.append(video_resolution)
+                    Reso_check.append(video_resolution[0]+str(video_resolution[3]))
+            print(Reso_check)
             for stream in streams.filter(only_audio=True):
                 audio_resolution = stream.abr, stream.itag, stream.filesize, stream.audio_codec
                 Aud_list.append(audio_resolution)

@@ -89,7 +89,7 @@ def merge(video_data, audio_data):
 
 def store_resolution(raw_list, new_list):
     for i in range(len(raw_list)):
-        data = raw_list[i][0] + " " + str(round(raw_list[i][2] / (1024 * 1024), 2)) + "mb"
+        data = f"{raw_list[i][0]} {str(round(raw_list[i][2] / (1024 * 1024), 2))}  mb"
         new_list.append(data)
 
 def Audio_Ui():
@@ -179,9 +179,9 @@ def Youtube_Gui():
             streams = yt.streams
             for stream in streams.filter(only_video=True):
                 video_resolution = stream.resolution, stream.itag, stream.filesize, stream.fps
-                if video_resolution[0] + str(video_resolution[3]) not in Reso_check:
+                if f"{video_resolution[0]}  {str(video_resolution[3])}" not in Reso_check and video_resolution[0]!=None:
                     Reso_list.append(video_resolution)
-                    Reso_check.append(video_resolution[0] + str(video_resolution[3]))
+                    Reso_check.append(f"{video_resolution[0]}  {str(video_resolution[3])}")
             for stream in streams.filter(only_audio=True):
                 audio_resolution = stream.abr, stream.itag, stream.filesize, stream.audio_codec
                 Aud_list.append(audio_resolution)
@@ -260,7 +260,6 @@ def main():
     if st.session_state["select_option"] == "⬇️ Only Audio":
         st.session_state.checked_2 = False
         Audio_Ui()
-
 
 
 if __name__ == "__main__":

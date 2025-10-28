@@ -8,7 +8,8 @@ video_segment_list, audio_segment_list, Reso_list, Aud_list, vid_resolution, aud
 video_file, audio_file, output_file = "Video.mp4", "Audio.mp3", 'Downloaded.mp4'
 only_audio = []
 total_received, percentage = 0, 0
-
+Resolution_list=[]
+Raw_rso_list=[]
 
 def create_throttles(size):
     mb = 1024 * 1024
@@ -163,7 +164,6 @@ def Audio_Ui():
             st.error("Please Enter Valid Url!")
 
 def Youtube_Gui():
-    st.session_state.checked = False
     st.title("Youtube Video Downloader")
     inp1, inp2 = st.columns(2)
     with inp1:
@@ -250,17 +250,164 @@ def Youtube_Gui():
         except RegexMatchError:
             st.error("Please Enter Valid Url!")
 
+def segment_resolution(yt):
+    streams=yt.streams.filter(only_video=True)
+    for stream in streams:
+        if stream.resolution not in Resolution_list and stream.resolution!=None:
+            Raw_rso_list.append([stream.resolution,stream.itag])
+            Resolution_list.append(stream.resolution)
+
+
+def Section_Download():
+    st.title("Youtube Segment Trimmer ✂")
+    col1, col2 = st.columns(2)
+    with col1:
+        url = st.text_input("Enter Video Url:")
+    with col2:
+        st.markdown("<div style='height:25px'></div>", unsafe_allow_html=True)
+        check = st.button("Check")
+    if check:
+        st.session_state.checked_3 = True
+    if st.session_state.get("checked_3", False):
+        if url:
+            try:
+                yt = YouTube(url)
+                duration = yt.length
+                segment_resolution(yt)
+                section_1, section_2 = st.columns(2)
+                with section_1:
+                    selected_resolution = st.selectbox("Available Resolutions:", Resolution_list)
+                with section_2:
+                    audio = st.checkbox("With Audio")
+
+                if "Trim" not in st.session_state:
+                    st.session_state.Trim = False
+                if "start" not in st.session_state:
+                    st.session_state.start = 0
+                if "play" not in st.session_state:
+                    st.session_state.play = False
+
+                # Set Trim state based on URL
+                st.session_state.Trim = True if url else False
+
+                # Play video
+
+                st.video(url, autoplay=True, start_time=st.session_state.start)
+
+                # If trimming mode is ON
+                if st.session_state.Trim:
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        start = st.number_input("Start Time:", min_value=0, max_value=duration)
+                    with col4:
+                        end = st.number_input("End Time:", min_value=1, max_value=duration)
+                    with col3:
+                        s_point = st.button("Start")
+                    with col4:
+                        e_point = st.button("End")
+
+                    if s_point and start < end:
+                        st.session_state.start = start
+                        st.session_state.play = True
+                        st.rerun()
+
+                    if e_point and start < end:
+                        st.session_state.start = end
+                        st.session_state.play = True
+                        st.rerun()
+                    if start >= end:
+                        st.info("Trim segment, start time must be less than end time!")
+                    process = st.button("Process")
+                    if process:
+                        stream_1 = yt.streams.get_by_itag(Raw_rso_list[Resolution_list.index(selected_resolution)][1])
+                        file_size = stream_1.filesize
+                        stream_1_url = stream_1.url
+                        if audio:
+                            stream_2 = yt.streams.get_lowest_resolution()
+                            stream_2_url = stream_2.url
+                            file_size += stream_2.filesize
+
+                        progress_bar = st.progress(0)
+                        downloading_status = st.empty()
+
+                        with ThreadPoolExecutor() as executor:
+                            t1 = executor.submit(create_throttles, file_size)
+                            if audio:
+                                t2 = executor.submit(create_throttles, file_size)
+
+                        video_throttles = t1.result()
+                        if audio:
+                            audio_throttles = t2.result()
+
+                        with ThreadPoolExecutor() as executor:
+                            executor.submit(range_list, file_size, video_throttles, "Video")
+                            if audio:
+                                executor.submit(range_list, file_size, audio_throttles, "Audio")
+
+                        with ThreadPoolExecutor() as executor:
+                            executor.submit(download_segments, video_throttles,stream_1_url, video_segment_list,
+                                            video_file,
+                                            file_size)
+                            output_file="Video.mp4"
+                            if audio:
+                                executor.submit(download_segments, audio_throttles, stream_2_url, audio_segment_list,
+                                            audio_file,
+                                            file_size)
+                                output_file="Downloaded.mp4"
+                            while total_received < file_size:
+                                progress_bar.progress(min(int(percentage), 100))
+                                downloading_status.text(f"Processed:{percentage}%")
+                                time.sleep(0.5)
+                                if total_received == file_size:
+                                    progress_bar.progress(100)
+                                    downloading_status.text(f"Processed:100%")
+                                    break
+                        if audio:
+                            merge(video_file, audio_file)
+
+
+
+                        if start < end and end <= duration:
+                            with st.spinner("Trimming video, please wait..."):
+                                subprocess.run([
+                                    'ffmpeg', '-y', '-ss', f'{start}', '-to', f'{end}', '-i', f'{output_file}',
+                                    '-c', 'copy', '-avoid_negative_ts', '1', 'trimmed.mp4'
+                                ])
+                        else:
+                            st.warning("Trim segment, end time must be greater than Video Duration!")
+                        trimmed_file = "trimmed.mp4"
+                        with open(trimmed_file, "rb") as f:
+                            st.download_button(
+                                label="⬇️ Download Video",
+                                data=f,
+                                file_name=trimmed_file,
+                                mime="video/mp4"
+                            )
+                        os.remove(output_file)
+                        os.remove(trimmed_file)
+            except RegexMatchError:
+                st.error("Please enter a valid URL!")
+            except TypeError:
+                st.error("Please enter a valid URL!")
+
+        else:
+            st.warning("Enter URL!")
 def main():
     st.sidebar.title("Options:")
-    select_option = st.sidebar.selectbox("Youtube_Options:", ["▶️ Video Download", "⬇️ Only Audio"])
+    select_option = st.sidebar.selectbox("Youtube_Options:", ["▶️ Video Download", "⬇️ Only Audio","✂ Segment Download"])
     st.session_state["select_option"] = select_option
     if st.session_state.select_option == "▶️ Video Download":
         st.session_state.checked_1 = False
+        st.session_state.checked_3 = False
         Youtube_Gui()
     if st.session_state["select_option"] == "⬇️ Only Audio":
         st.session_state.checked_2 = False
+        st.session_state.checked_3 = False
         Audio_Ui()
-
+    if st.session_state["select_option"] == "✂ Segment Download":
+        st.session_state.checked_2 = False
+        st.session_state.checked_1 = False
+        Section_Download()
 
 if __name__ == "__main__":
     main()
